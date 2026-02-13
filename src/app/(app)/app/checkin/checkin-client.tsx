@@ -2,6 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { addPendingEvent } from "@/lib/offline-store";
+import { isOnline } from "@/lib/sync";
+import { SlideButton } from "@/components/slide-button";
 
 interface ActiveVisit {
   id: string;
@@ -144,15 +147,41 @@ export function CheckinClient({ initialActiveVisit }: CheckinClientProps) {
     try {
       const geo = await getGeolocation();
 
+      const payload = {
+        companyId: selectedCompany?.id,
+        checkInLat: geo.lat ?? undefined,
+        checkInLng: geo.lng ?? undefined,
+        noGpsReason: geo.noGpsReason,
+      };
+
+      // Verificar se está offline
+      if (!isOnline()) {
+        // Guardar no IndexedDB para sincronização posterior
+        await addPendingEvent("checkin", payload);
+        
+        // Criar visita "temporária" localmente
+        const tempVisit: ActiveVisit = {
+          id: `temp-${Date.now()}`,
+          checkInAt: new Date().toISOString(),
+          companyId: selectedCompany?.id,
+        };
+        
+        setActiveVisit(tempVisit);
+        setStatus("success");
+        setError("✓ Check-in guardado offline. Será sincronizado quando voltar online.");
+
+        // Disparar evento para atualizar indicador no header
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new Event("visitUpdated"));
+        }
+        return;
+      }
+
+      // Modo online - processar normalmente
       const res = await fetch("/api/visits/checkin", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          companyId: selectedCompany?.id,
-          checkInLat: geo.lat ?? undefined,
-          checkInLng: geo.lng ?? undefined,
-          noGpsReason: geo.noGpsReason,
-        }),
+        body: JSON.stringify(payload),
       });
 
       if (!res.ok) {
@@ -170,6 +199,11 @@ export function CheckinClient({ initialActiveVisit }: CheckinClientProps) {
         companyId: data.visit.companyId,
       });
       setStatus("success");
+
+      // Disparar evento para atualizar indicador no header
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("visitUpdated"));
+      }
     } catch (err) {
       console.error(err);
       setError(
@@ -188,14 +222,33 @@ export function CheckinClient({ initialActiveVisit }: CheckinClientProps) {
     try {
       const geo = await getGeolocation();
 
+      const payload = {
+        checkOutLat: geo.lat ?? undefined,
+        checkOutLng: geo.lng ?? undefined,
+        noGpsReason: geo.noGpsReason,
+      };
+
+      // Verificar se está offline
+      if (!isOnline()) {
+        // Guardar no IndexedDB para sincronização posterior
+        await addPendingEvent("checkout", payload);
+        
+        setActiveVisit(null);
+        setStatus("success");
+        setError("✓ Check-out guardado offline. Será sincronizado quando voltar online.");
+
+        // Disparar evento para atualizar indicador no header
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new Event("visitUpdated"));
+        }
+        return;
+      }
+
+      // Modo online - processar normalmente
       const res = await fetch("/api/visits/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          checkOutLat: geo.lat ?? undefined,
-          checkOutLng: geo.lng ?? undefined,
-          noGpsReason: geo.noGpsReason,
-        }),
+        body: JSON.stringify(payload),
       });
 
       if (!res.ok) {
@@ -205,6 +258,11 @@ export function CheckinClient({ initialActiveVisit }: CheckinClientProps) {
 
       setActiveVisit(null);
       setStatus("success");
+
+      // Disparar evento para atualizar indicador no header
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("visitUpdated"));
+      }
     } catch (err) {
       console.error(err);
       setError(
@@ -343,28 +401,28 @@ export function CheckinClient({ initialActiveVisit }: CheckinClientProps) {
           </div>
 
           {!hasActiveVisit ? (
-            <button
-              type="button"
-              onClick={handleCheckin}
+            <SlideButton
+              onConfirm={handleCheckin}
               disabled={status === "loading"}
-              className="h-16 w-full max-w-sm rounded-2xl bg-emerald-600 px-4 text-base font-semibold uppercase tracking-wide text-white shadow-lg transition active:scale-95 disabled:opacity-60"
-            >
-              Entrei no Cliente (Check-in)
-            </button>
+              text="Check-in"
+              variant="success"
+            />
           ) : (
-            <button
-              type="button"
-              onClick={handleCheckout}
+            <SlideButton
+              onConfirm={handleCheckout}
               disabled={status === "loading"}
-              className="h-16 w-full max-w-sm rounded-2xl bg-red-600 px-4 text-base font-semibold uppercase tracking-wide text-white shadow-lg transition active:scale-95 disabled:opacity-60"
-            >
-              Saí do Cliente (Check-out)
-            </button>
+              text="Check-out"
+              variant="danger"
+            />
           )}
         </div>
 
         {error && (
-          <p className="mt-4 text-xs font-medium text-red-600 dark:text-red-400">
+          <p className={`mt-4 text-xs font-medium ${
+            error.startsWith("✓") 
+              ? "text-emerald-600 dark:text-emerald-400" 
+              : "text-red-600 dark:text-red-400"
+          }`}>
             {error}
           </p>
         )}
