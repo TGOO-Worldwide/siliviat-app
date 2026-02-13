@@ -5,6 +5,7 @@ import { redirect, notFound } from "next/navigation";
 import { AudioRecorder } from "./audio-recorder";
 import { TranscriptionAnalysis } from "./transcription-analysis";
 import { SaleForm } from "./sale-form";
+import { AssociateCompany } from "./associate-company";
 
 interface AuthSession {
   user: {
@@ -113,26 +114,32 @@ export default async function VisitPage({ params }: VisitPageProps) {
 
         <div className="space-y-3">
           {/* Empresa */}
-          {visit.company && (
-            <div>
-              <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400">
-                EMPRESA
-              </p>
-              <p className="text-base font-semibold text-zinc-900 dark:text-zinc-100">
-                {visit.company.name}
-              </p>
-              {visit.company.address && (
-                <p className="text-sm text-zinc-600 dark:text-zinc-400">
-                  📍 {visit.company.address}
+          <div>
+            <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400">
+              EMPRESA
+            </p>
+            {visit.company ? (
+              <>
+                <p className="text-base font-semibold text-zinc-900 dark:text-zinc-100">
+                  {visit.company.name}
                 </p>
-              )}
-              {visit.company.phone && (
-                <p className="text-sm text-zinc-600 dark:text-zinc-400">
-                  📞 {visit.company.phone}
-                </p>
-              )}
-            </div>
-          )}
+                {visit.company.address && (
+                  <p className="text-sm text-zinc-600 dark:text-zinc-400">
+                    📍 {visit.company.address}
+                  </p>
+                )}
+                {visit.company.phone && (
+                  <p className="text-sm text-zinc-600 dark:text-zinc-400">
+                    📞 {visit.company.phone}
+                  </p>
+                )}
+              </>
+            ) : (
+              <p className="text-sm italic text-zinc-500 dark:text-zinc-400">
+                Sem empresa associada
+              </p>
+            )}
+          </div>
 
           {/* Comercial */}
           <div>
@@ -287,14 +294,7 @@ export default async function VisitPage({ params }: VisitPageProps) {
         </section>
       )}
 
-      {!visit.company && (
-        <section className="rounded-2xl bg-white p-4 shadow-sm dark:bg-zinc-900">
-          <h2 className="mb-1 text-lg font-semibold">💰 Registo de Vendas</h2>
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">
-            ℹ️ Para registar uma venda, é necessário associar uma empresa a esta visita.
-          </p>
-        </section>
-      )}
+      {!visit.company && <AssociateCompany visitId={visit.id} />}
     </div>
   );
 }

@@ -10,12 +10,17 @@ import { ActiveVisitIndicator } from "@/components/active-visit-indicator";
 export function TopBar() {
   const { data: session } = useSession();
   const { theme, toggleTheme, mounted } = useTheme();
-  const [online, setOnline] = useState<boolean>(
-    typeof navigator !== "undefined" ? navigator.onLine : true
-  );
+  const [online, setOnline] = useState<boolean>(true);
+  const [clientMounted, setClientMounted] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
+
+  // Inicializar estado online após montagem no cliente
+  useEffect(() => {
+    setClientMounted(true);
+    setOnline(navigator.onLine);
+  }, []);
 
   // Atualizar contador de eventos pendentes
   const updatePendingCount = useCallback(async () => {
@@ -90,16 +95,18 @@ export function TopBar() {
   return (
     <header className="flex items-center justify-between gap-2 border-b border-zinc-200 bg-white/80 px-3 py-3 text-sm shadow-sm backdrop-blur dark:border-zinc-800 dark:bg-zinc-900/80">
       <div className="flex min-w-0 flex-1 items-center gap-3">
-        <div className="flex items-center gap-2">
-          <span
-            className={`h-2 w-2 rounded-full ${
-              online ? "bg-emerald-500" : "bg-zinc-400"
-            }`}
-          />
-          <span className="hidden text-xs font-medium uppercase tracking-wide text-zinc-600 sm:inline dark:text-zinc-300">
-            {online ? "Online" : "Offline"}
-          </span>
-        </div>
+        {clientMounted && (
+          <div className="flex items-center gap-2">
+            <span
+              className={`h-2 w-2 rounded-full ${
+                online ? "bg-emerald-500" : "bg-zinc-400"
+              }`}
+            />
+            <span className="hidden text-xs font-medium uppercase tracking-wide text-zinc-600 sm:inline dark:text-zinc-300">
+              {online ? "Online" : "Offline"}
+            </span>
+          </div>
+        )}
 
         {/* Indicador de visita ativa */}
         <ActiveVisitIndicator />

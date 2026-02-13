@@ -102,11 +102,11 @@ model Visit {
   talkedToRole TalkedToRole?
 
   audioUrl       String?
-  transcriptText String?
+  transcriptText String? @db.Text
 
   aiSentiment       Sentiment?
   aiTags            Json? // representa string[]
-  aiSummary         String?
+  aiSummary         String? @db.Text
   aiNextActions     Json? // array de objetos {title, priority, dueDate?, done}
   suggestedFollowup Json?
 
