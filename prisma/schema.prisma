@@ -1,0 +1,168 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  SALES
+}
+
+enum TalkedToRole {
+  OWNER
+  MANAGER
+  EMPLOYEE
+}
+
+enum Sentiment {
+  POSITIVE
+  NEGATIVE
+  NEUTRAL
+}
+
+enum TaskStatus {
+  OPEN
+  DONE
+}
+
+enum TaskSource {
+  AI
+  MANUAL
+}
+
+model User {
+  id             String   @id @default(cuid())
+  name           String?
+  email          String   @unique
+  role           UserRole @default(SALES)
+  passwordHash   String
+  passkeyEnabled Boolean  @default(false)
+
+  visits  Visit[]
+  sales   Sale[]
+  tasks   Task[]
+  logs    AuditLog[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Company {
+  id      String  @id @default(cuid())
+  name    String
+  address String?
+  phone   String?
+  email   String?
+  nif     String?
+
+  visits Visit[]
+  sales  Sale[]
+  tasks  Task[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Technology {
+  id          String  @id @default(cuid())
+  name        String  @unique
+  description String?
+  active      Boolean @default(true)
+
+  sales Sale[]
+}
+
+model Visit {
+  id        String @id @default(cuid())
+  userId    String
+  companyId String?
+
+  user    User?   @relation(fields: [userId], references: [id])
+  company Company? @relation(fields: [companyId], references: [id])
+
+  checkInAt       DateTime
+  checkOutAt      DateTime?
+  durationSeconds Int?
+
+  checkInLat  Float?
+  checkInLng  Float?
+  checkOutLat Float?
+  checkOutLng Float?
+
+  talkedToRole TalkedToRole?
+
+  audioUrl       String?
+  transcriptText String?
+
+  aiSentiment       Sentiment?
+  aiTags            Json? // representa string[]
+  aiSummary         String?
+  aiNextActions     Json? // array de objetos {title, priority, dueDate?, done}
+  suggestedFollowup Json?
+
+  sales Sale[]
+  tasks Task[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Sale {
+  id           String  @id @default(cuid())
+  userId       String
+  companyId    String
+  visitId      String?
+  technologyId String
+
+  valueCents Int?
+  notes      String?
+
+  user       User       @relation(fields: [userId], references: [id])
+  company    Company    @relation(fields: [companyId], references: [id])
+  visit      Visit?     @relation(fields: [visitId], references: [id])
+  technology Technology @relation(fields: [technologyId], references: [id])
+
+  createdAt DateTime @default(now())
+}
+
+model Task {
+  id        String      @id @default(cuid())
+  userId    String
+  companyId String?
+  visitId   String?
+
+  title  String
+  status TaskStatus @default(OPEN)
+  dueAt  DateTime?
+  source TaskSource @default(MANUAL)
+
+  user    User    @relation(fields: [userId], references: [id])
+  company Company? @relation(fields: [companyId], references: [id])
+  visit   Visit?  @relation(fields: [visitId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  action    String
+  ip        String?
+  userAgent String?
+  metadata  Json?
+
+  user      User?    @relation(fields: [userId], references: [id])
+
+  createdAt DateTime @default(now())
+}

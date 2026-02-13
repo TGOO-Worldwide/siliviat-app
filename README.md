@@ -1,36 +1,94 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+## TGOO Visitas – MVP Interno
 
-## Getting Started
+Aplicação interna para equipa comercial TGOO em formato PWA (mobile-first) para registo de visitas presenciais, vendas e follow-ups, com áudio + IA.
 
-First, run the development server:
+> **📋 Para contexto completo do projeto e progresso de desenvolvimento, consulta [`PROGRESSO-DESENVOLVIMENTO.md`](./PROGRESSO-DESENVOLVIMENTO.md)**
+
+**Status Atual**: Fases 1–4 completas ✅  
+- ✅ Setup do projeto + Auth + Layouts
+- ✅ Prisma + MySQL + Seed
+- ✅ Check-in/Check-out com GPS e timer
+- ✅ Pesquisa e criação de empresas
+
+### Stack
+- **Framework**: Next.js 14 (App Router) + TypeScript  
+- **UI**: TailwindCSS v4 + shadcn/ui (design mobile-first)  
+- **Auth**: NextAuth (Credenciais, com Passkeys/WebAuthn planeados)  
+- **BD**: MySQL via Prisma  
+- **Outros**: bcrypt, zod
+
+---
+
+## Setup de Desenvolvimento
+
+### 1. Dependências
+
+```bash
+npm install
+```
+
+### 2. Configurar base de dados MySQL
+
+Crie uma base de dados MySQL local (por exemplo `siliviat`).
+
+Exemplo de URL:
+
+```bash
+export DATABASE_URL="mysql://user:password@localhost:3306/siliviat"
+```
+
+Defina `DATABASE_URL` no seu `.env` (ou via ambiente) antes de correr as migrations.
+
+### 3. Variáveis de ambiente básicas
+
+Crie um `.env` baseado em `.env.example` com pelo menos:
+
+```bash
+DATABASE_URL="mysql://user:password@localhost:3306/siliviat"
+NEXTAUTH_URL="http://localhost:3000"
+NEXTAUTH_SECRET="algum-segredo-seguro"
+DEV_ADMIN_EMAIL="admin@example.com"
+DEV_ADMIN_PASSWORD="admin123"
+```
+
+### 4. Prisma – migrations e seed
+
+Aplicar o schema à base de dados e gerar cliente:
+
+```bash
+npx prisma migrate dev --name init
+npx prisma generate
+```
+
+Popular utilizador admin e tecnologias iniciais:
+
+```bash
+npm run prisma:seed
+```
+
+---
+
+## Correr o projeto
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Abra `http://localhost:3000` no browser.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- Login de desenvolvimento (após seed):  
+  - **Email**: valor de `DEV_ADMIN_EMAIL`  
+  - **Password**: valor de `DEV_ADMIN_PASSWORD`
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- Ao entrar, será redirecionado para `/app/checkin`.  
+- Área de administração em `/admin/dashboard` (necessita role `ADMIN`).
 
-## Learn More
+---
 
-To learn more about Next.js, take a look at the following resources:
+## Roadmap de Fases (resumo)
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- **Fase 1**: Setup, auth básica, layouts `/app` e `/admin` e páginas shell.  
+- **Fase 2**: Modelos Prisma (User, Company, Technology, Visit, Sale, Task, AuditLog), migrations e seed.  
+- **Fase 3**: Check-in/out com GPS e timer.
+- **Fase 4**: Pesquisa e criação de empresas + integração com check-in.
+- **Fase 5+**: Áudio + upload, IA (transcrição/análise), vendas, dashboards e PWA/offline.
