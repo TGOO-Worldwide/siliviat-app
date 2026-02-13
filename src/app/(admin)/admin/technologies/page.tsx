@@ -1,14 +1,37 @@
-export default function AdminTechnologiesPage() {
-  return (
-    <div className="space-y-4">
-      <section className="rounded-2xl bg-white p-4 shadow-sm dark:bg-zinc-900">
-        <h1 className="mb-1 text-lg font-semibold">Tecnologias</h1>
-        <p className="text-sm text-zinc-600 dark:text-zinc-400">
-          Gestão de tecnologias vendidas (lista, estado ativo/inativo) será
-          desenvolvida aqui.
-        </p>
-      </section>
-    </div>
-  );
+import { getServerSession } from "next-auth";
+import { authConfig, AppSession } from "@/lib/auth";
+import { redirect } from "next/navigation";
+import { prisma } from "@/lib/prisma";
+import TechnologiesAdminClient from "./technologies-admin-client";
+
+export default async function AdminTechnologiesPage() {
+  // Validar autenticação e role
+  const session = (await getServerSession(authConfig)) as AppSession | null;
+
+  if (!session?.user) {
+    redirect("/login");
+  }
+
+  if (session.user.role !== "ADMIN") {
+    redirect("/app/dashboard");
+  }
+
+  // Buscar todas as tecnologias (ativas e inativas)
+  const technologies = await prisma.technology.findMany({
+    orderBy: { name: "asc" },
+    select: {
+      id: true,
+      name: true,
+      description: true,
+      active: true,
+      _count: {
+        select: {
+          sales: true,
+        },
+      },
+    },
+  });
+
+  return <TechnologiesAdminClient initialTechnologies={technologies} />;
 }
 

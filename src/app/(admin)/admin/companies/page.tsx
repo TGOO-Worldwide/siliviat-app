@@ -1,14 +1,51 @@
-export default function AdminCompaniesPage() {
-  return (
-    <div className="space-y-4">
-      <section className="rounded-2xl bg-white p-4 shadow-sm dark:bg-zinc-900">
-        <h1 className="mb-1 text-lg font-semibold">Empresas (Admin)</h1>
-        <p className="text-sm text-zinc-600 dark:text-zinc-400">
-          Gestão completa de empresas (CRUD, filtros) será implementada aqui nas
-          fases posteriores.
-        </p>
-      </section>
-    </div>
-  );
+import { getServerSession } from "next-auth";
+import { authConfig, AppSession } from "@/lib/auth";
+import { redirect } from "next/navigation";
+import { prisma } from "@/lib/prisma";
+import CompaniesAdminClient from "./companies-admin-client";
+
+export default async function AdminCompaniesPage() {
+  // Validar autenticação e role
+  const session = (await getServerSession(authConfig)) as AppSession | null;
+
+  if (!session?.user) {
+    redirect("/login");
+  }
+
+  if (session.user.role !== "ADMIN") {
+    redirect("/app/dashboard");
+  }
+
+  // Buscar empresas iniciais (primeiras 20)
+  const [companies, total] = await Promise.all([
+    prisma.company.findMany({
+      orderBy: { name: "asc" },
+      take: 20,
+      select: {
+        id: true,
+        name: true,
+        address: true,
+        phone: true,
+        email: true,
+        nif: true,
+        createdAt: true,
+        _count: {
+          select: {
+            visits: true,
+            sales: true,
+          },
+        },
+      },
+    }),
+    prisma.company.count(),
+  ]);
+
+  // Converter dates para strings
+  const companiesFormatted = companies.map((c) => ({
+    ...c,
+    createdAt: c.createdAt.toISOString(),
+  }));
+
+  return <CompaniesAdminClient initialCompanies={companiesFormatted} initialTotal={total} />;
 }
 

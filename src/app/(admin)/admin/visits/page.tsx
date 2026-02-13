@@ -1,13 +1,57 @@
-export default function AdminVisitsPage() {
-  return (
-    <div className="space-y-4">
-      <section className="rounded-2xl bg-white p-4 shadow-sm dark:bg-zinc-900">
-        <h1 className="mb-1 text-lg font-semibold">Visitas (Admin)</h1>
-        <p className="text-sm text-zinc-600 dark:text-zinc-400">
-          Lista e gestão de visitas de toda a equipa serão apresentadas aqui.
-        </p>
-      </section>
-    </div>
-  );
+import { getServerSession } from "next-auth";
+import { authConfig, AppSession } from "@/lib/auth";
+import { redirect } from "next/navigation";
+import { prisma } from "@/lib/prisma";
+import VisitsAdminClient from "./visits-admin-client";
+
+export default async function AdminVisitsPage() {
+  // Validar autenticação e role
+  const session = (await getServerSession(authConfig)) as AppSession | null;
+
+  if (!session?.user) {
+    redirect("/login");
+  }
+
+  if (session.user.role !== "ADMIN") {
+    redirect("/app/dashboard");
+  }
+
+  // Buscar visitas iniciais (primeiras 20)
+  const [visits, total] = await Promise.all([
+    prisma.visit.findMany({
+      orderBy: { checkInAt: "desc" },
+      take: 20,
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+        company: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+        _count: {
+          select: {
+            sales: true,
+          },
+        },
+      },
+    }),
+    prisma.visit.count(),
+  ]);
+
+  // Converter dates para strings
+  const visitsFormatted = visits.map((v) => ({
+    ...v,
+    checkInAt: v.checkInAt.toISOString(),
+    checkOutAt: v.checkOutAt?.toISOString() || null,
+  }));
+
+  return <VisitsAdminClient initialVisits={visitsFormatted} initialTotal={total} />;
 }
 
