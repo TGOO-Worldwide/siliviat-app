@@ -89,7 +89,7 @@ async function getAdminMetrics() {
     .sort((a, b) => b.totalVisits - a.totalVisits);
 
   // 3. Visitas recentes (últimas 20)
-  const recentVisits = await prisma.visit.findMany({
+  const recentVisitsRaw = await prisma.visit.findMany({
     orderBy: { checkInAt: "desc" },
     take: 20,
     include: {
@@ -109,8 +109,22 @@ async function getAdminMetrics() {
     },
   });
 
+  // Serializar datas para string (compatível com AdminMetrics)
+  const recentVisits = recentVisitsRaw.map((v) => ({
+    id: v.id,
+    checkInAt: v.checkInAt.toISOString(),
+    checkOutAt: v.checkOutAt?.toISOString() ?? null,
+    durationSeconds: v.durationSeconds,
+    user: v.user
+      ? { id: v.user.id, name: v.user.name, email: v.user.email }
+      : { id: "", name: null, email: null },
+    company: v.company
+      ? { id: v.company.id, name: v.company.name }
+      : null,
+  }));
+
   // 4. Vendas recentes (últimas 20)
-  const recentSales = await prisma.sale.findMany({
+  const recentSalesRaw = await prisma.sale.findMany({
     orderBy: { createdAt: "desc" },
     take: 20,
     include: {
@@ -135,6 +149,19 @@ async function getAdminMetrics() {
       },
     },
   });
+
+  const recentSales = recentSalesRaw.map((s) => ({
+    id: s.id,
+    createdAt: s.createdAt.toISOString(),
+    valueCents: s.valueCents,
+    user: s.user
+      ? { id: s.user.id, name: s.user.name, email: s.user.email }
+      : { id: "", name: null, email: null },
+    company: s.company
+      ? { id: s.company.id, name: s.company.name }
+      : { id: "", name: "N/A" },
+    technology: { id: s.technology.id, name: s.technology.name },
+  }));
 
   // 5. Tecnologias mais vendidas
   const salesByTechnology = await prisma.sale.groupBy({

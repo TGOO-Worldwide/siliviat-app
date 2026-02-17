@@ -104,22 +104,26 @@ async function getSalesMetrics(userId: string) {
   const totalSalesValue = sales.reduce((sum, s) => sum + (s.valueCents || 0), 0);
 
   // 5. Vendas por tecnologia
-  const salesByTechnology = Object.values(
-    sales.reduce((acc: any, sale) => {
-      const techId = sale.technologyId;
-      if (!acc[techId]) {
-        acc[techId] = {
-          technologyId: techId,
-          technologyName: sale.technology.name,
-          count: 0,
-          totalValue: 0,
-        };
-      }
-      acc[techId].count += 1;
-      acc[techId].totalValue += sale.valueCents || 0;
-      return acc;
-    }, {})
-  );
+  const salesByTechRecord = sales.reduce<
+    Record<
+      string,
+      { technologyId: string; technologyName: string; count: number; totalValue: number }
+    >
+  >((acc, sale) => {
+    const techId = sale.technologyId;
+    if (!acc[techId]) {
+      acc[techId] = {
+        technologyId: techId,
+        technologyName: sale.technology.name,
+        count: 0,
+        totalValue: 0,
+      };
+    }
+    acc[techId].count += 1;
+    acc[techId].totalValue += sale.valueCents || 0;
+    return acc;
+  }, {});
+  const salesByTechnology = Object.values(salesByTechRecord);
 
   // 6. Tarefas pendentes
   const pendingTasks = await prisma.task.findMany({
@@ -167,6 +171,27 @@ async function getSalesMetrics(userId: string) {
     take: 10,
   });
 
+  const pendingTasksList = pendingTasks.map((t) => ({
+    id: t.id,
+    title: t.title,
+    dueAt: t.dueAt?.toISOString() ?? null,
+    source: t.source,
+    visit: t.visit
+      ? {
+          id: t.visit.id,
+          checkInAt: t.visit.checkInAt.toISOString(),
+        }
+      : null,
+    company: t.company ? { id: t.company.id, name: t.company.name } : null,
+  }));
+
+  const upcomingFollowupsSerialized = upcomingFollowups.map((v) => ({
+    id: v.id,
+    checkInAt: v.checkInAt.toISOString(),
+    suggestedFollowup: v.suggestedFollowup,
+    company: v.company ? { id: v.company.id, name: v.company.name } : null,
+  }));
+
   return {
     totalVisits,
     totalDurationMinutes,
@@ -177,8 +202,8 @@ async function getSalesMetrics(userId: string) {
     totalSalesValue,
     salesByTechnology,
     pendingTasks: pendingTasks.length,
-    pendingTasksList: pendingTasks,
-    upcomingFollowups,
+    pendingTasksList,
+    upcomingFollowups: upcomingFollowupsSerialized,
   };
 }
 

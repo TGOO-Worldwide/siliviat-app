@@ -1,0 +1,55 @@
+# Deploy da aplicação Siliviat para servidor Cloud Panel via SSH
+# Dispara no push para main ou manualmente (workflow_dispatch)
+
+name: Deploy to Cloud Panel
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: Deploy via SSH
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Deploy no servidor via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.SERVER_PORT || '22' }}
+          script_stop: true
+          script: |
+            set -e
+            cd ${{ secrets.SERVER_APP_PATH }}
+
+            echo ">>> Git pull..."
+            git fetch origin main
+            git reset --hard origin/main
+
+            echo ">>> Instalando dependências..."
+            npm ci
+
+            echo ">>> Prisma generate..."
+            npx prisma generate
+
+            echo ">>> Migrações (produção)..."
+            npx prisma migrate deploy
+
+            echo ">>> Build Next.js..."
+            npm run build
+
+            echo ">>> Reiniciando aplicação..."
+            if command -v pm2 &> /dev/null; then
+              pm2 restart siliviat --update-env || pm2 start npm --name siliviat -- start
+            elif systemctl is-active --quiet siliviat 2>/dev/null; then
+              sudo systemctl restart siliviat
+            else
+              echo "Configure PM2 ou systemd para o app. Por ora apenas build concluído."
+            fi
+
+            echo ">>> Deploy concluído."
