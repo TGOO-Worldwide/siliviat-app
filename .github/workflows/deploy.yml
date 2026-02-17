@@ -25,6 +25,12 @@ jobs:
           script_stop: true
           script: |
             set -e
+            # Carregar ambiente para ter npm/node no PATH (nvm, n, etc.)
+            [ -f "$HOME/.nvm/nvm.sh" ] && . "$HOME/.nvm/nvm.sh"
+            [ -f "$HOME/.profile" ] && . "$HOME/.profile"
+            [ -f "$HOME/.bashrc" ] && . "$HOME/.bashrc"
+            [ -f "/etc/profile" ] && . /etc/profile
+
             cd ${{ secrets.SERVER_APP_PATH }}
 
             echo ">>> Git pull..."
