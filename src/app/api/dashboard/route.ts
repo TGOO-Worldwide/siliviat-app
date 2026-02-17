@@ -170,11 +170,12 @@ async function getSalesMetrics(userId: string) {
 // Métricas para admin (visão global)
 async function getAdminMetrics() {
   // 1. Métricas globais
-  const [totalVisits, totalSales, totalUsers, totalCompanies] = await Promise.all([
+  const [totalVisits, totalSales, totalUsers, totalCompanies, totalTechnologies] = await Promise.all([
     prisma.visit.count(),
     prisma.sale.count(),
     prisma.user.count({ where: { role: "SALES" } }),
     prisma.company.count(),
+    prisma.technology.count({ where: { active: true } }),
   ]);
 
   // 2. Ranking de comerciais por visitas
@@ -320,6 +321,7 @@ async function getAdminMetrics() {
     totalSales,
     totalUsers,
     totalCompanies,
+    totalTechnologies,
     conversionRate,
     salesRanking,
     recentVisits,

@@ -8,6 +8,7 @@ interface AdminMetrics {
   totalSales: number;
   totalUsers: number;
   totalCompanies: number;
+  totalTechnologies: number;
   conversionRate: number;
   salesRanking: {
     userId: string;
@@ -160,12 +161,47 @@ export default function AdminDashboardClient({ initialData }: AdminDashboardClie
         <div className="rounded-2xl bg-white p-6 shadow-sm dark:bg-zinc-900">
           <div className="flex items-center justify-between">
             <p className="text-sm font-medium text-zinc-600 dark:text-zinc-400">
+              Tecnologias
+            </p>
+            <span className="text-2xl">🔧</span>
+          </div>
+          <p className="mt-2 text-3xl font-bold">{metrics.totalTechnologies}</p>
+          <Link
+            href="/admin/technologies"
+            className="mt-1 text-xs text-emerald-600 hover:underline"
+          >
+            Gerir →
+          </Link>
+        </div>
+      </div>
+
+      {/* Cards de Métricas Secundárias */}
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="rounded-2xl bg-white p-6 shadow-sm dark:bg-zinc-900">
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-medium text-zinc-600 dark:text-zinc-400">
               Taxa de Conversão
             </p>
             <span className="text-2xl">📈</span>
           </div>
           <p className="mt-2 text-3xl font-bold">{metrics.conversionRate}%</p>
           <p className="mt-1 text-xs text-zinc-500">Visitas → Vendas</p>
+        </div>
+
+        <div className="rounded-2xl bg-white p-6 shadow-sm dark:bg-zinc-900">
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-medium text-zinc-600 dark:text-zinc-400">
+              Empresas
+            </p>
+            <span className="text-2xl">🏢</span>
+          </div>
+          <p className="mt-2 text-3xl font-bold">{metrics.totalCompanies}</p>
+          <Link
+            href="/admin/companies"
+            className="mt-1 text-xs text-emerald-600 hover:underline"
+          >
+            Ver todas →
+          </Link>
         </div>
       </div>
 
@@ -232,7 +268,15 @@ export default function AdminDashboardClient({ initialData }: AdminDashboardClie
       {/* Tecnologias Mais Vendidas */}
       {metrics.topTechnologies.length > 0 && (
         <section className="rounded-2xl bg-white p-6 shadow-sm dark:bg-zinc-900">
-          <h2 className="mb-4 text-lg font-semibold">Tecnologias Mais Vendidas</h2>
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-lg font-semibold">Tecnologias Mais Vendidas</h2>
+            <Link
+              href="/admin/technologies"
+              className="text-sm text-emerald-600 hover:underline"
+            >
+              Gerir tecnologias →
+            </Link>
+          </div>
           <div className="space-y-3">
             {metrics.topTechnologies.slice(0, 5).map((tech) => (
               <div
