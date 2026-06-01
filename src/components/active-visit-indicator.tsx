@@ -18,7 +18,7 @@ export function ActiveVisitIndicator() {
 
   const fetchActiveVisit = useCallback(async () => {
     try {
-      const res = await fetch("/api/visits/active");
+      const res = await fetch("/api/visits/active", { cache: "no-store" });
       if (res.ok) {
         const data = await res.json();
         setActiveVisit(data.visit || null);

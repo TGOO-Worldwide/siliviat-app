@@ -2,14 +2,21 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { addPendingEvent } from "@/lib/offline-store";
 import { isOnline } from "@/lib/sync";
 import { SlideButton } from "@/components/slide-button";
+import { AssociateCompany } from "@/app/(app)/app/visit/[id]/associate-company";
+import { CompanyPicker } from "@/components/company-picker";
+import { CompanyCreateForm } from "@/components/company-create-form";
+import { ActiveVisitCompanyCard } from "./active-visit-company-card";
+import { PostCheckoutCompanyModal } from "./post-checkout-company-modal";
 
 interface ActiveVisit {
   id: string;
   checkInAt: string;
   companyId?: string;
+  companyName?: string;
 }
 
 interface CheckinClientProps {
@@ -26,24 +33,117 @@ type Company = {
 };
 
 export function CheckinClient({ initialActiveVisit }: CheckinClientProps) {
-  const [activeVisit, setActiveVisit] = useState<ActiveVisit | null>(
-    initialActiveVisit
-  );
+  const router = useRouter();
+  const [activeVisit, setActiveVisit] = useState<ActiveVisit | null>(initialActiveVisit);
+  const [visitSynced, setVisitSynced] = useState(Boolean(initialActiveVisit));
   const [status, setStatus] = useState<Status>("idle");
   const [error, setError] = useState<string | null>(null);
 
   // Pesquisa de empresa
-  const [companySearchQuery, setCompanySearchQuery] = useState("");
-  const [companySearchResults, setCompanySearchResults] = useState<Company[]>([]);
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
-  const [isSearchingCompany, setIsSearchingCompany] = useState(false);
+  const [showCompanyPicker, setShowCompanyPicker] = useState(false);
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [showAssociatePanel, setShowAssociatePanel] = useState(false);
+  const [postCheckoutVisitId, setPostCheckoutVisitId] = useState<string | null>(
+    null
+  );
 
-  const [now, setNow] = useState<Date>(new Date());
+  const [now, setNow] = useState<Date | null>(null);
 
-  // Timer da visita ativa
+  const finishCheckout = useCallback(
+    (visitId: string, hadCompany: boolean) => {
+      setActiveVisit(null);
+      setShowCompanyPicker(false);
+      setShowCreateForm(false);
+      setShowAssociatePanel(false);
+      setStatus("success");
+
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("visitUpdated"));
+      }
+
+      if (hadCompany) {
+        router.push(`/app/visit/${visitId}`);
+        return;
+      }
+
+      setPostCheckoutVisitId(visitId);
+    },
+    [router]
+  );
+
+  const fetchActiveVisit = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/visits/active?_=${Date.now()}`, {
+        cache: "no-store",
+        headers: {
+          "Cache-Control": "no-cache",
+          Pragma: "no-cache",
+        },
+      });
+      if (!res.ok) return;
+
+      const data = await res.json();
+      const serverVisit: ActiveVisit | null = data.visit ?? null;
+
+      setActiveVisit((current) => {
+        if (current?.id.startsWith("temp-") && !serverVisit) {
+          return current;
+        }
+        if (!serverVisit) return null;
+        if (current && current.id === serverVisit.id) {
+          return {
+            ...serverVisit,
+            companyId: serverVisit.companyId ?? current.companyId,
+            companyName: serverVisit.companyName ?? current.companyName,
+          };
+        }
+        return serverVisit;
+      });
+    } catch (err) {
+      console.error("Erro ao sincronizar visita ativa:", err);
+    } finally {
+      setVisitSynced(true);
+    }
+  }, []);
+
+  // Sincronizar com o servidor ao montar e ao voltar à página
   useEffect(() => {
-    if (!activeVisit) return;
+    fetchActiveVisit();
 
+    const handleVisitUpdate = () => {
+      fetchActiveVisit();
+    };
+
+    const handlePageShow = () => {
+      fetchActiveVisit();
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        fetchActiveVisit();
+      }
+    };
+
+    window.addEventListener("visitUpdated", handleVisitUpdate);
+    window.addEventListener("pageshow", handlePageShow);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener("visitUpdated", handleVisitUpdate);
+      window.removeEventListener("pageshow", handlePageShow);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [fetchActiveVisit]);
+
+  // Timer da visita ativa (now só é definido no cliente, após hidratação)
+  useEffect(() => {
+    if (!activeVisit) {
+      setNow(null);
+      return;
+    }
+
+    setNow(new Date());
     const interval = setInterval(() => {
       setNow(new Date());
     }, 1000);
@@ -51,34 +151,8 @@ export function CheckinClient({ initialActiveVisit }: CheckinClientProps) {
     return () => clearInterval(interval);
   }, [activeVisit]);
 
-  // Debounce de pesquisa de empresa
-  useEffect(() => {
-    if (!companySearchQuery.trim()) {
-      setCompanySearchResults([]);
-      return;
-    }
-
-    const timer = setTimeout(async () => {
-      setIsSearchingCompany(true);
-      try {
-        const params = new URLSearchParams({ query: companySearchQuery, limit: "5" });
-        const res = await fetch(`/api/companies?${params.toString()}`);
-        if (res.ok) {
-          const data = await res.json();
-          setCompanySearchResults(data.companies || []);
-        }
-      } catch (err) {
-        console.error("Erro ao pesquisar empresas:", err);
-      } finally {
-        setIsSearchingCompany(false);
-      }
-    }, 300);
-
-    return () => clearTimeout(timer);
-  }, [companySearchQuery]);
-
   const durationLabel = useMemo(() => {
-    if (!activeVisit) return "00:00:00";
+    if (!visitSynced || !activeVisit || !now) return "00:00:00";
     const start = new Date(activeVisit.checkInAt).getTime();
     const diffSeconds = Math.max(0, Math.floor((now.getTime() - start) / 1000));
 
@@ -90,7 +164,7 @@ export function CheckinClient({ initialActiveVisit }: CheckinClientProps) {
     const seconds = String(diffSeconds % 60).padStart(2, "0");
 
     return `${hours}:${minutes}:${seconds}`;
-  }, [activeVisit, now]);
+  }, [activeVisit, now, visitSynced]);
 
   const getGeolocation = useCallback(
     () =>
@@ -164,6 +238,7 @@ export function CheckinClient({ initialActiveVisit }: CheckinClientProps) {
           id: `temp-${Date.now()}`,
           checkInAt: new Date().toISOString(),
           companyId: selectedCompany?.id,
+          companyName: selectedCompany?.name,
         };
         
         setActiveVisit(tempVisit);
@@ -190,14 +265,21 @@ export function CheckinClient({ initialActiveVisit }: CheckinClientProps) {
       }
 
       const data = (await res.json()) as {
-        visit: { id: string; checkInAt: string; companyId?: string };
+        visit: {
+          id: string;
+          checkInAt: string;
+          companyId?: string;
+          companyName?: string;
+        };
       };
 
       setActiveVisit({
         id: data.visit.id,
         checkInAt: data.visit.checkInAt,
         companyId: data.visit.companyId,
+        companyName: data.visit.companyName ?? selectedCompany?.name,
       });
+      setShowCompanyPicker(false);
       setStatus("success");
 
       // Disparar evento para atualizar indicador no header
@@ -219,6 +301,9 @@ export function CheckinClient({ initialActiveVisit }: CheckinClientProps) {
     setError(null);
     setStatus("loading");
 
+    const visitBeforeCheckout = activeVisit;
+    const hadCompany = Boolean(visitBeforeCheckout?.companyId);
+
     try {
       const geo = await getGeolocation();
 
@@ -230,21 +315,28 @@ export function CheckinClient({ initialActiveVisit }: CheckinClientProps) {
 
       // Verificar se está offline
       if (!isOnline()) {
-        // Guardar no IndexedDB para sincronização posterior
         await addPendingEvent("checkout", payload);
-        
-        setActiveVisit(null);
-        setStatus("success");
-        setError("✓ Check-out guardado offline. Será sincronizado quando voltar online.");
 
-        // Disparar evento para atualizar indicador no header
+        setActiveVisit(null);
+        setShowCompanyPicker(false);
+        setShowCreateForm(false);
+        setStatus("success");
+        setError(
+          "✓ Check-out guardado offline. Será sincronizado quando voltar online."
+        );
+
         if (typeof window !== "undefined") {
           window.dispatchEvent(new Event("visitUpdated"));
         }
         return;
       }
 
-      // Modo online - processar normalmente
+      if (visitBeforeCheckout?.id.startsWith("temp-")) {
+        throw new Error(
+          "Visita offline ainda não sincronizada. Volte online para concluir o check-out."
+        );
+      }
+
       const res = await fetch("/api/visits/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -253,16 +345,19 @@ export function CheckinClient({ initialActiveVisit }: CheckinClientProps) {
 
       if (!res.ok) {
         const data = await res.json().catch(() => null);
-        throw new Error(data?.error ?? "Falha no check-out.");
+        const message = data?.error ?? "Falha no check-out.";
+        if (message === "Não existe visita ativa para fazer check-out.") {
+          setActiveVisit(null);
+          window.dispatchEvent(new Event("visitUpdated"));
+        }
+        throw new Error(message);
       }
 
-      setActiveVisit(null);
-      setStatus("success");
+      const data = (await res.json()) as {
+        visit: { id: string };
+      };
 
-      // Disparar evento para atualizar indicador no header
-      if (typeof window !== "undefined") {
-        window.dispatchEvent(new Event("visitUpdated"));
-      }
+      finishCheckout(data.visit.id, hadCompany);
     } catch (err) {
       console.error(err);
       setError(
@@ -274,108 +369,166 @@ export function CheckinClient({ initialActiveVisit }: CheckinClientProps) {
     }
   }
 
-  const hasActiveVisit = Boolean(activeVisit);
+  const hasActiveVisit = visitSynced && Boolean(activeVisit);
+  const showCompanyCard =
+    hasActiveVisit &&
+    Boolean(activeVisit?.companyId) &&
+    !activeVisit!.id.startsWith("temp-");
+  const canAssociateCompany =
+    hasActiveVisit &&
+    activeVisit &&
+    !activeVisit.companyId &&
+    !activeVisit.id.startsWith("temp-");
 
   return (
     <div className="space-y-4">
+      {postCheckoutVisitId && (
+        <PostCheckoutCompanyModal
+          visitId={postCheckoutVisitId}
+          onClose={() => setPostCheckoutVisitId(null)}
+        />
+      )}
+
+      {showCompanyCard && (
+        <ActiveVisitCompanyCard
+          visitId={activeVisit!.id}
+          companyName={activeVisit!.companyName ?? "Empresa"}
+        />
+      )}
+
+      {/* Associar empresa durante visita ativa */}
+      {canAssociateCompany && (
+        <section className="rounded-2xl bg-white p-4 shadow-sm dark:bg-zinc-900">
+          {!showAssociatePanel ? (
+            <button
+              type="button"
+              onClick={() => setShowAssociatePanel(true)}
+              className="w-full rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700 hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-300 dark:hover:bg-emerald-900/30"
+            >
+              Associar Empresa
+            </button>
+          ) : (
+            <div className="space-y-3">
+              <AssociateCompany
+                visitId={activeVisit!.id}
+                onSuccess={(company) => {
+                  setActiveVisit((prev) =>
+                    prev
+                      ? {
+                          ...prev,
+                          companyId: company.id,
+                          companyName: company.name,
+                        }
+                      : null
+                  );
+                  setShowAssociatePanel(false);
+                  window.dispatchEvent(new Event("visitUpdated"));
+                  router.refresh();
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => setShowAssociatePanel(false)}
+                className="w-full rounded-lg border border-zinc-200 px-4 py-2 text-sm text-zinc-600 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800"
+              >
+                Cancelar
+              </button>
+            </div>
+          )}
+        </section>
+      )}
+
       {/* Seleção de empresa (apenas se não houver visita ativa) */}
       {!hasActiveVisit && (
         <section className="rounded-2xl bg-white p-4 shadow-sm dark:bg-zinc-900">
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-sm font-semibold">Empresa a visitar</h2>
-            <Link
-              href="/app/companies"
-              className="text-xs text-emerald-600 hover:text-emerald-700 dark:text-emerald-400"
-            >
-              Ver todas
-            </Link>
-          </div>
-
           {selectedCompany ? (
-            <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 dark:border-emerald-800 dark:bg-emerald-900/20">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="font-medium text-emerald-900 dark:text-emerald-100">
-                    {selectedCompany.name}
-                  </p>
-                  {selectedCompany.address && (
-                    <p className="mt-1 text-xs text-emerald-700 dark:text-emerald-300">
-                      📍 {selectedCompany.address}
+            <>
+              <h2 className="mb-3 text-sm font-semibold">Empresa a visitar</h2>
+              <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 dark:border-emerald-800 dark:bg-emerald-900/20">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="font-medium text-emerald-900 dark:text-emerald-100">
+                      {selectedCompany.name}
                     </p>
-                  )}
-                  {selectedCompany.phone && (
-                    <p className="text-xs text-emerald-700 dark:text-emerald-300">
-                      📞 {selectedCompany.phone}
-                    </p>
-                  )}
+                    {selectedCompany.address && (
+                      <p className="mt-1 text-xs text-emerald-700 dark:text-emerald-300">
+                        📍 {selectedCompany.address}
+                      </p>
+                    )}
+                    {selectedCompany.phone && (
+                      <p className="text-xs text-emerald-700 dark:text-emerald-300">
+                        📞 {selectedCompany.phone}
+                      </p>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedCompany(null);
+                      setShowCompanyPicker(true);
+                    }}
+                    className="text-xs text-emerald-600 hover:text-emerald-700 dark:text-emerald-400"
+                  >
+                    Alterar
+                  </button>
                 </div>
+              </div>
+            </>
+          ) : !showCompanyPicker ? (
+            <>
+              <h2 className="mb-3 text-sm font-semibold">Empresa a visitar</h2>
+              <button
+                type="button"
+                onClick={() => setShowCompanyPicker(true)}
+                className="w-full rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700 hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-300 dark:hover:bg-emerald-900/30"
+              >
+                Escolher empresa
+              </button>
+            </>
+          ) : (
+            <>
+              <div className="mb-3 flex items-center justify-between">
+                <h2 className="text-sm font-semibold">Empresa a visitar</h2>
                 <button
-                  onClick={() => setSelectedCompany(null)}
-                  className="text-xs text-emerald-600 hover:text-emerald-700 dark:text-emerald-400"
+                  type="button"
+                  onClick={() => setShowCreateForm((prev) => !prev)}
+                  className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-700 active:bg-emerald-800"
                 >
-                  Alterar
+                  {showCreateForm ? "Cancelar" : "+ Nova Empresa"}
                 </button>
               </div>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              <input
-                type="search"
-                placeholder="🔍 Pesquisar empresa..."
-                value={companySearchQuery}
-                onChange={(e) => setCompanySearchQuery(e.target.value)}
-                className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100"
-              />
+              <div className="space-y-2">
+                {showCreateForm ? (
+                  <CompanyCreateForm
+                    idPrefix="checkin-company"
+                    onSuccess={(company) => {
+                      setSelectedCompany(company);
+                      setShowCreateForm(false);
+                      setShowCompanyPicker(false);
+                    }}
+                  />
+                ) : (
+                  <>
+                    <CompanyPicker onSelect={setSelectedCompany} />
 
-              {isSearchingCompany && (
-                <p className="text-xs text-zinc-500">A pesquisar...</p>
-              )}
-
-              {!isSearchingCompany && companySearchResults.length > 0 && (
-                <div className="space-y-1">
-                  {companySearchResults.map((company) => (
-                    <button
-                      key={company.id}
-                      onClick={() => {
-                        setSelectedCompany(company);
-                        setCompanySearchQuery("");
-                        setCompanySearchResults([]);
-                      }}
-                      className="w-full rounded-lg border border-zinc-200 bg-white p-2 text-left text-sm hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-800 dark:hover:bg-zinc-700"
-                    >
-                      <p className="font-medium text-zinc-900 dark:text-zinc-100">
-                        {company.name}
-                      </p>
-                      {company.address && (
-                        <p className="text-xs text-zinc-600 dark:text-zinc-400">
-                          {company.address}
-                        </p>
-                      )}
-                    </button>
-                  ))}
-                </div>
-              )}
-
-              {!isSearchingCompany &&
-                companySearchQuery.trim() &&
-                companySearchResults.length === 0 && (
-                  <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-3 text-center dark:border-zinc-700 dark:bg-zinc-800">
-                    <p className="text-xs text-zinc-600 dark:text-zinc-400">
-                      Nenhuma empresa encontrada.
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                      ℹ️ Opcional: pode fazer check-in sem associar empresa
                     </p>
-                    <Link
-                      href="/app/companies"
-                      className="mt-1 inline-block text-xs font-medium text-emerald-600 hover:text-emerald-700 dark:text-emerald-400"
-                    >
-                      Criar nova empresa
-                    </Link>
-                  </div>
+                  </>
                 )}
 
-              <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                ℹ️ Opcional: pode fazer check-in sem associar empresa
-              </p>
-            </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowCompanyPicker(false);
+                    setShowCreateForm(false);
+                  }}
+                  className="w-full rounded-lg border border-zinc-200 px-4 py-2 text-sm text-zinc-600 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </>
           )}
         </section>
       )}

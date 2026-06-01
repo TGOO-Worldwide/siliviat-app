@@ -5,7 +5,7 @@ import { redirect, notFound } from "next/navigation";
 import { AudioRecorder } from "./audio-recorder";
 import { TranscriptionAnalysis } from "./transcription-analysis";
 import { SaleForm } from "./sale-form";
-import { AssociateCompany } from "./associate-company";
+import { VisitCompanySection } from "./visit-company-section";
 
 interface AuthSession {
   user: {
@@ -114,32 +114,10 @@ export default async function VisitPage({ params }: VisitPageProps) {
 
         <div className="space-y-3">
           {/* Empresa */}
-          <div>
-            <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400">
-              EMPRESA
-            </p>
-            {visit.company ? (
-              <>
-                <p className="text-base font-semibold text-zinc-900 dark:text-zinc-100">
-                  {visit.company.name}
-                </p>
-                {visit.company.address && (
-                  <p className="text-sm text-zinc-600 dark:text-zinc-400">
-                    📍 {visit.company.address}
-                  </p>
-                )}
-                {visit.company.phone && (
-                  <p className="text-sm text-zinc-600 dark:text-zinc-400">
-                    📞 {visit.company.phone}
-                  </p>
-                )}
-              </>
-            ) : (
-              <p className="text-sm italic text-zinc-500 dark:text-zinc-400">
-                Sem empresa associada
-              </p>
-            )}
-          </div>
+          <VisitCompanySection
+            visitId={visit.id}
+            company={visit.company}
+          />
 
           {/* Comercial */}
           <div>
@@ -293,8 +271,6 @@ export default async function VisitPage({ params }: VisitPageProps) {
           />
         </section>
       )}
-
-      {!visit.company && <AssociateCompany visitId={visit.id} />}
     </div>
   );
 }

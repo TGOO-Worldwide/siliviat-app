@@ -62,7 +62,7 @@ cat deploy_key.pub >> ~/.ssh/authorized_keys
 4. Inicie a aplicação com PM2 (recomendado):
 
    ```bash
-   pm2 start npm --name siliviat -- start
+   PORT=3000 pm2 start npm --name siliviat -- start
    pm2 save
    pm2 startup
    ```

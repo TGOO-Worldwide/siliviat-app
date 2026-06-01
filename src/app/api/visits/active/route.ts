@@ -5,15 +5,23 @@ import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 
+const NO_CACHE_HEADERS = {
+  "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+  Pragma: "no-cache",
+  Expires: "0",
+};
+
 export async function GET() {
   try {
     const session = await getServerSession(authConfig);
 
     if (!session?.user?.id) {
-      return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
+      return NextResponse.json(
+        { error: "Não autorizado" },
+        { status: 401, headers: NO_CACHE_HEADERS }
+      );
     }
 
-    // Buscar a visita ativa (sem check-out) do usuário
     const activeVisit = await prisma.visit.findFirst({
       where: {
         userId: session.user.id,
@@ -32,22 +40,28 @@ export async function GET() {
     });
 
     if (!activeVisit) {
-      return NextResponse.json({ visit: null });
+      return NextResponse.json(
+        { visit: null },
+        { headers: NO_CACHE_HEADERS }
+      );
     }
 
-    return NextResponse.json({
-      visit: {
-        id: activeVisit.id,
-        checkInAt: activeVisit.checkInAt.toISOString(),
-        companyId: activeVisit.companyId,
-        companyName: activeVisit.company?.name,
+    return NextResponse.json(
+      {
+        visit: {
+          id: activeVisit.id,
+          checkInAt: activeVisit.checkInAt.toISOString(),
+          companyId: activeVisit.companyId,
+          companyName: activeVisit.company?.name,
+        },
       },
-    });
+      { headers: NO_CACHE_HEADERS }
+    );
   } catch (error) {
     console.error("Erro ao buscar visita ativa:", error);
     return NextResponse.json(
       { error: "Erro ao buscar visita ativa" },
-      { status: 500 }
+      { status: 500, headers: NO_CACHE_HEADERS }
     );
   }
 }
