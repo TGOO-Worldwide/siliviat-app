@@ -2,8 +2,7 @@ import { getServerSession } from "next-auth";
 import { authConfig } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { redirect, notFound } from "next/navigation";
-import { AudioRecorder } from "./audio-recorder";
-import { TranscriptionAnalysis } from "./transcription-analysis";
+import { VisitAudioSection } from "./visit-audio-section";
 import { SaleForm } from "./sale-form";
 import { VisitCompanySection } from "./visit-company-section";
 
@@ -194,14 +193,11 @@ export default async function VisitPage({ params }: VisitPageProps) {
         </div>
       </section>
 
-      {/* Componente de Gravação de Áudio */}
-      <AudioRecorder visitId={visit.id} existingAudioUrl={visit.audioUrl} />
-
-      {/* Transcrição e Análise IA (Fase 6) */}
-      <TranscriptionAnalysis
+      {/* Gravação de áudio + transcrição IA */}
+      <VisitAudioSection
         visitId={visit.id}
-        hasAudio={!!visit.audioUrl}
-        initialData={{
+        initialAudioUrl={visit.audioUrl}
+        transcriptionInitialData={{
           transcriptText: visit.transcriptText,
           aiSentiment: visit.aiSentiment,
           aiTags: visit.aiTags,

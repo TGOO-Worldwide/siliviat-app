@@ -63,14 +63,11 @@ export function AudioRecorder({
       const data = await response.json();
       setUploadSuccess(true);
 
-      // Callback de sucesso
-      if (onUploadSuccess) {
-        onUploadSuccess(data.audioUrl);
-      }
+      // Atualizar estado do pai antes de limpar a gravação local
+      onUploadSuccess?.(data.audioUrl);
+      resetRecording();
 
-      // Limpar gravação após 2 segundos
       setTimeout(() => {
-        resetRecording();
         setUploadSuccess(false);
       }, 2000);
     } catch (err) {
