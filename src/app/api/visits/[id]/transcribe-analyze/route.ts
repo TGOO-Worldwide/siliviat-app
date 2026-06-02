@@ -83,7 +83,7 @@ export async function POST(
       }
     }
 
-    // 7. TRANSCRIÇÃO: Chamar OpenAI Whisper
+    // 7. TRANSCRIÇÃO (provedor: AI_PROVIDER — openai ou gemini)
     console.log(`🎤 Iniciando transcrição de áudio: ${visit.audioUrl}`);
     const transcription = await transcribeAudio(visit.audioUrl);
     
