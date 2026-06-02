@@ -79,6 +79,51 @@ O workflow tenta, nesta ordem:
 
 Para que o deploy reinicie sozinho, use PM2 (como acima) ou systemd.
 
+### Uploads de áudio (Cloudflare R2 — recomendado)
+
+Em produção, o ideal é guardar os áudios num bucket **Cloudflare R2** (API compatível com S3). Assim os ficheiros persistem entre deploys e não dependem do disco do servidor.
+
+#### 1. Criar bucket no Cloudflare
+
+1. Aceda a [Cloudflare Dashboard](https://dash.cloudflare.com/) → **R2 Object Storage**.
+2. Crie um bucket (ex: `siliviat-audio`).
+3. Em **Manage R2 API Tokens**, crie um token com permissão de leitura e escrita no bucket.
+4. Anote: **Account ID**, **Access Key ID**, **Secret Access Key** e **Bucket Name**.
+
+#### 2. Acesso público (recomendado para reprodução no browser)
+
+Para o `<audio>` carregar directamente do R2:
+
+1. No bucket, active **Public access** (R2 dev subdomain) **ou** configure um domínio customizado.
+2. Defina `R2_PUBLIC_URL` com a URL base (sem barra final):
+   - Subdomínio R2: `https://pub-xxxxxxxx.r2.dev`
+   - Domínio customizado: `https://media.seudominio.com`
+
+#### 3. Variáveis no `.env` de produção
+
+```bash
+R2_ACCOUNT_ID="seu-account-id"
+R2_ACCESS_KEY_ID="seu-access-key"
+R2_SECRET_ACCESS_KEY="seu-secret-key"
+R2_BUCKET_NAME="siliviat-audio"
+R2_PUBLIC_URL="https://pub-xxxxxxxx.r2.dev"
+```
+
+Se **todas** as variáveis `R2_*` (exceto `R2_PUBLIC_URL`) estiverem definidas, a app usa R2 automaticamente. Sem R2, cai no storage local em `data/uploads/audio/`.
+
+#### Fallback local (sem R2)
+
+Se preferir disco local, crie o diretório no servidor:
+
+```bash
+mkdir -p data/uploads/audio
+chmod 755 data/uploads/audio
+```
+
+Opcionalmente: `UPLOAD_DIR=/var/lib/siliviat/uploads/audio`
+
+**Nota:** áudios gravados antes de configurar o R2 (ou em desenvolvimento local) não existem no bucket — precisam ser regravados em produção.
+
 ## 3. Resumo do que o workflow faz
 
 1. Conecta por SSH no servidor.

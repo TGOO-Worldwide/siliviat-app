@@ -46,6 +46,9 @@ jobs:
             echo ">>> Migrações (produção)..."
             npx prisma migrate deploy
 
+            echo ">>> Diretório persistente de uploads..."
+            mkdir -p data/uploads/audio
+
             echo ">>> Build Next.js..."
             npm run build
 

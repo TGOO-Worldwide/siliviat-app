@@ -1,5 +1,4 @@
-import { readFile } from "fs/promises";
-import { join } from "path";
+import { readAudioBuffer } from "@/lib/audio-storage";
 
 /**
  * Helper para transcrição de áudio usando OpenAI Whisper API
@@ -35,17 +34,13 @@ export async function transcribeAudio(
   }
 
   try {
-    // Converter URL relativo para caminho absoluto no filesystem
-    const filepath = join(process.cwd(), "public", audioUrl);
-
-    // Ler ficheiro de áudio
-    const audioBuffer = await readFile(filepath);
+    const { buffer: audioBuffer, contentType } = await readAudioBuffer(audioUrl);
 
     // Preparar FormData para envio
     const formData = new FormData();
     
     // Criar Blob a partir do Buffer
-    const audioBlob = new Blob([audioBuffer], { type: "audio/webm" });
+    const audioBlob = new Blob([new Uint8Array(audioBuffer)], { type: contentType });
     
     // Adicionar ficheiro ao FormData
     formData.append("file", audioBlob, "audio.webm");

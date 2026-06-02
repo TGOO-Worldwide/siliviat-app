@@ -45,3 +45,4 @@ next-env.d.ts
 # uploads (áudios, etc.)
 /public/uploads/audio/*
 !/public/uploads/audio/.gitkeep
+/data/uploads/
